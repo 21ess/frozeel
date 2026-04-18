@@ -11,6 +11,7 @@
 
 # Test binary, built with `go test -c`
 *.test
+data/
 
 # Code coverage profiles and other test artifacts
 *.out
@@ -31,3 +32,6 @@ go.work.sum
 # Editor/IDE
 .idea/
 .vscode/
+
+# OS
+**/.DS_Store
