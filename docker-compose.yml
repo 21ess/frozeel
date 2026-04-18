@@ -1,0 +1,32 @@
+services:
+  mongo:
+    image: mongo:8.0.15
+    container_name: frozeel-mongo
+    restart: unless-stopped # 失败重启，停止需要 docker stop 后
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - ./data/mongo:/data/db # 数据挂载到当前目录下的 data/mongo 文件夹
+    networks:
+      - frozeel-net
+
+  app:
+    build: .
+    container_name: frozeel-app
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URI: mongodb://admin:password@mongo:27017
+    networks:
+      - frozeel-net
+
+networks:
+  frozeel-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
