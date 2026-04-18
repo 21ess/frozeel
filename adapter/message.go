@@ -1,7 +1,7 @@
 // Package adapter
 package adapter
 
-// IncomingMessage 统一的入站消息模型
+// IncomingMessage 统一的消息模型
 type IncomingMessage struct {
 	// 消息基本信息
 	MessageID string
@@ -12,7 +12,7 @@ type IncomingMessage struct {
 	SenderName string
 
 	// 会话信息
-	ChatID   string
+	ChatID   int64
 	ChatType ChatType // Private or Group
 
 	// 是否是命令 (如 /start, /quiz)

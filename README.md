@@ -1,7 +1,9 @@
 ##  介绍
 
 冻鳗糕手(frozen eel bot)：一个基于 llm 的 im 聊天机器人
- 
+
+基本数据流 v1
+![image-20260418175612137](https://txcould-image-1318385221.cos.ap-nanjing.myqcloud.com/image/image-20260418175612137.png)
 
 ## 目录结构
 ```text

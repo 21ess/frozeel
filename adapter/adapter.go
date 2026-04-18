@@ -18,7 +18,7 @@ type IMAdapter interface {
 	OnCommand(command string, handler MessageHandler)
 
 	// SendText 发送文本消息到指定会话
-	SendText(ctx context.Context, chatID string, text string) error
+	SendText(ctx context.Context, chatID int64, text string) error
 
 	// ReplyText 回复某条消息
 	ReplyText(ctx context.Context, chatID string, replyToMsgID string, text string) error
