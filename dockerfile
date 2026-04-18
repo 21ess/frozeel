@@ -21,6 +21,6 @@ WORKDIR /app
 # 复制二进制和配置
 COPY --from=builder /app/frozeel .
 COPY --from=builder /app/config ./config
-COPY --from=builder /app/.env .
+# COPY --from=builder /app/.env .
 
 CMD ["./frozeel"]
