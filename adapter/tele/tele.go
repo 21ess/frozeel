@@ -3,6 +3,7 @@ package tele
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -43,7 +44,7 @@ func (t *TelegramAdapter) Start(ctx context.Context) error {
 	// Register a catch-all text handler that dispatches to messageHandler.
 	t.bot.Handle(telebot.OnText, func(c telebot.Context) error {
 		if t.messageHandler == nil {
-			return nil
+			return errors.New("message handler not set")
 		}
 		msg := toIncomingMessage(c.Message())
 		t.messageHandler(ctx, msg)
