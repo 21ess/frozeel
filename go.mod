@@ -6,3 +6,5 @@ require (
 	github.com/joho/godotenv v1.5.1
 	gopkg.in/telebot.v4 v4.0.0-beta.7
 )
+
+require github.com/cloudwego/eino v0.8.11 // indirect
