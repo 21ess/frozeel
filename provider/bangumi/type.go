@@ -40,8 +40,8 @@ func (b *Provider) GetRandomCharacter(ctx context.Context) (*provider.Character,
 		Image:    pickFirstImage(char.Images),
 		Gender:   char.Gender,
 		Birthday: parseBirthday(char),
-		Nsfw:     char.NSFW,
-		Tags:     parseTags(char.Infobox),
+		// Nsfw:     char.NSFW,
+		Tags: parseTags(char.Infobox),
 	}, nil
 }
 
@@ -65,7 +65,7 @@ func (b *Provider) GetCharacterByName(ctx context.Context, name string) (*provid
 		// Image:    pickFirstImage(char.Images),
 		Gender:   char.Gender,
 		Birthday: parseBirthday(char),
-		Nsfw:     char.NSFW,
+		// Nsfw:     char.NSFW,
 		// Tags:     parseTags(char.Infobox),
 	}, nil
 }
