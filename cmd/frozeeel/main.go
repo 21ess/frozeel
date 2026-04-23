@@ -129,7 +129,7 @@ func loadGame(chatID int64) (*game.Game, bool) {
 }
 
 func startGame(ctx context.Context, msg adapter.IncomingMessage, bot adapter.IMAdapter) {
-	p := &bangumi.Provider{Token: os.Getenv("BANGUMI_TOKEN")}
+	p := &bangumi.BmProvider{Token: os.Getenv("BANGUMI_TOKEN")}
 	g := game.NewGame(p)
 	games.Store(msg.ChatID, g)
 
