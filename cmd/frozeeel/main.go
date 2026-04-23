@@ -86,6 +86,8 @@ func main() {
 		}
 	})
 
+	// TODO: handle guess
+
 	bot.OnMessage(func(ctx context.Context, msg adapter.IncomingMessage) {
 		fmt.Printf("[%d] %s: %s\n", msg.ChatID, msg.SenderName, msg.Text)
 

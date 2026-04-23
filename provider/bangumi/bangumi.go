@@ -9,6 +9,7 @@ import (
 	"io"
 	rand2 "math/rand/v2"
 	"net/http"
+	"time"
 
 	"github.com/21ess/frozeel/provider"
 )
@@ -17,8 +18,8 @@ type BmProvider struct {
 	Token string
 }
 
-func (b *BmProvider) GetRandomSubject(ctx context.Context) (*provider.Subject, error) {
-	//TODO implement me
+func (b *BmProvider) GetRandomSubject(ctx context.Context, start, end time.Time) (*provider.Subject, error) {
+	// TODO implement me
 	panic("implement me")
 }
 

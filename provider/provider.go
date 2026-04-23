@@ -1,10 +1,17 @@
 package provider
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type AnimeProvider interface {
-	GetRandomSubject(ctx context.Context) (*Subject, error)
+	// GetRandomSubject get a random subject with optional time duration  TODO: add indices
+	GetRandomSubject(ctx context.Context, start, end time.Time) (*Subject, error)
+
+	// GetRandomCharacter
 	GetRandomCharacter(ctx context.Context) (*Character, error)
+
 	GetCharacterByName(ctx context.Context, name string) (*Character, error)
 	// GetCharacterTags(ctx context.Context, name string) ([]string, error)
 }
@@ -24,9 +31,10 @@ type Character struct {
 
 // Subject is a set of characters, e.g. an anime, a manga...
 type Subject struct {
-	Name       string       `json:"name"`
-	Characters []*Character `json:"characters"`
-	Tags       []string     `json:"tags"`
-	Image      string       `json:"image"`
-	Nsfw       bool         `json:"nsfw"` // R18 or not / hentai or regular
+	Name        string       `json:"name"`
+	PublishDate time.Time    `json:"publish_date"`
+	Characters  []*Character `json:"characters"`
+	Tags        []string     `json:"tags"`
+	Image       string       `json:"image"`
+	Nsfw        bool         `json:"nsfw"` // R18 or not / hentai or regular
 }
