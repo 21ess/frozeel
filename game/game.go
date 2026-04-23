@@ -156,6 +156,7 @@ func (g *Game) processGuess(ev Event) {
 		PlayerName: ev.SenderName,
 	}
 
+	// TODO 修改为 agent 判断
 	if strings.EqualFold(guess, g.answer.Name) {
 		detail.Outcome = GuessCorrect
 		detail.Feedback = fmt.Sprintf("恭喜 %s 猜对了！答案就是 %s", ev.SenderName, g.answer.Name)

@@ -16,11 +16,11 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var allGames = sync.Map{}
+var games sync.Map // chatID -> *game.Game
 
 func main() {
-	// config.LoadDotEnv("../.env")
-	godotenv.Load()
+	godotenv.Load("../.env")
+
 	bot, err := tele.NewTelegramAdapter(os.Getenv("BOT_TOKEN"))
 	if err != nil {
 		log.Fatalf("failed to create adapter: %v", err)
@@ -29,7 +29,6 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 注册命令处理
 	bot.OnCommand("hello", func(ctx context.Context, msg adapter.IncomingMessage) {
 		if err := bot.SendText(ctx, msg.ChatID, "Hello!"); err != nil {
 			log.Printf("send error: %v", err)
@@ -37,53 +36,71 @@ func main() {
 	})
 
 	bot.OnCommand("start", func(ctx context.Context, msg adapter.IncomingMessage) {
-		if _, ok := allGames.Load(msg.ChatID); ok {
-			if err := bot.SendText(ctx, msg.ChatID, "游戏已经开始了哦～"); err != nil {
-				log.Printf("send error: %v", err)
-				return
+		if g, ok := loadGame(msg.ChatID); ok {
+			g.In <- game.Event{
+				Type:       game.EventStart,
+				SenderID:   msg.SenderID,
+				SenderName: msg.SenderName,
 			}
-		}
-
-		game := game.NewGame(&bangumi.Provider{Token: os.Getenv("BANGUMI_TOKEN")})
-		allGames.Store(msg.ChatID, game)
-		if err = game.HandleStart(ctx); err != nil {
-			bot.SendText(ctx, msg.ChatID, fmt.Sprintf("Failed to start a game: %s", err))
 			return
 		}
-		log.Printf("New game: %v", msg.ChatID)
-
-		bot.SendText(ctx, msg.ChatID, "Here comes a challenge!!!")
-		bot.SendText(ctx, msg.ChatID, "我已经想好了，来猜吧")
-
-		// [Test]
-		bot.SendText(ctx, msg.ChatID, fmt.Sprintf("[Test] 🫣不许偷看： %v", game.Answer))
+		startGame(ctx, msg, bot)
 	})
 
 	bot.OnCommand("end", func(ctx context.Context, msg adapter.IncomingMessage) {
-		_, ok := allGames.LoadAndDelete(msg.ChatID)
-		if ok {
-			bot.SendText(ctx, msg.ChatID, "冻鳗高手们拜拜啦👋～")
-		} else {
+		g, ok := loadGame(msg.ChatID)
+		if !ok {
 			bot.SendText(ctx, msg.ChatID, "你是猪吗，都还没开始就结束?")
+			return
 		}
-		log.Printf("Ended a game: %d", msg.ChatID)
+		g.In <- game.Event{
+			Type:       game.EventEnd,
+			SenderID:   msg.SenderID,
+			SenderName: msg.SenderName,
+		}
 	})
 
-	// TODO: send msg only visible to player who give up
-	// seems not support directly
 	bot.OnCommand("giveup", func(ctx context.Context, msg adapter.IncomingMessage) {
-		bot.SendText(ctx, msg.ChatID, "要放弃了吗，真是杂鱼😛")
-		bot.SendText(ctx, msg.ChatID, "暂不支持放弃后查看答案，略略略")
+		g, ok := loadGame(msg.ChatID)
+		if !ok {
+			bot.SendText(ctx, msg.ChatID, "都还没开始，放弃什么呢？")
+			return
+		}
+		g.In <- game.Event{
+			Type:       game.EventGiveUp,
+			SenderID:   msg.SenderID,
+			SenderName: msg.SenderName,
+		}
 	})
 
-	// TODO: handle guess
+	bot.OnCommand("hint", func(ctx context.Context, msg adapter.IncomingMessage) {
+		g, ok := loadGame(msg.ChatID)
+		if !ok {
+			bot.SendText(ctx, msg.ChatID, "还没有进行中的游戏哦")
+			return
+		}
+		g.In <- game.Event{
+			Type:       game.EventHint,
+			SenderID:   msg.SenderID,
+			SenderName: msg.SenderName,
+		}
+	})
 
-	// 注册通用消息处理
 	bot.OnMessage(func(ctx context.Context, msg adapter.IncomingMessage) {
 		fmt.Printf("[%d] %s: %s\n", msg.ChatID, msg.SenderName, msg.Text)
+
+		g, ok := loadGame(msg.ChatID)
+		if !ok {
+			return
+		}
+		g.In <- game.Event{
+			Type:       game.EventGuess,
+			SenderID:   msg.SenderID,
+			SenderName: msg.SenderName,
+			Payload:    msg.Text,
+		}
 	})
 
-	// 启动 bot（阻塞），放到 goroutine 中以便监听信号
 	go func() {
 		if err := bot.Start(ctx); err != nil {
 			log.Fatalf("bot start error: %v", err)
@@ -100,5 +117,72 @@ func main() {
 	cancel()
 	if err := bot.Stop(); err != nil {
 		log.Printf("stop error: %v", err)
+	}
+}
+
+func loadGame(chatID int64) (*game.Game, bool) {
+	v, ok := games.Load(chatID)
+	if !ok {
+		return nil, false
+	}
+	return v.(*game.Game), true
+}
+
+func startGame(ctx context.Context, msg adapter.IncomingMessage, bot adapter.IMAdapter) {
+	p := &bangumi.Provider{Token: os.Getenv("BANGUMI_TOKEN")}
+	g := game.NewGame(p)
+	games.Store(msg.ChatID, g)
+
+	gameCtx, gameCancel := context.WithCancel(ctx)
+
+	// Launch the game state machine
+	go g.Run(gameCtx)
+
+	// Launch the output renderer; cleans up when Out is closed
+	go func() {
+		defer gameCancel()
+		defer games.Delete(msg.ChatID)
+		for resp := range g.Out {
+			renderResponse(ctx, bot, msg.ChatID, resp)
+		}
+		log.Printf("game ended for chat %d", msg.ChatID)
+	}()
+
+	// Send the start event to kick off the game
+	g.In <- game.Event{
+		Type:       game.EventStart,
+		SenderID:   msg.SenderID,
+		SenderName: msg.SenderName,
+	}
+}
+
+func renderResponse(ctx context.Context, bot adapter.IMAdapter, chatID int64, resp game.Response) {
+	var text string
+
+	switch resp.Type {
+	case game.RespGameStarted:
+		text = resp.Text
+	case game.RespGuessResult:
+		if resp.Guess != nil {
+			text = resp.Guess.Feedback
+		}
+	case game.RespHint:
+		text = resp.Text
+	case game.RespGameEnded:
+		text = resp.Text
+	case game.RespError:
+		text = fmt.Sprintf("[Error] %s", resp.Text)
+	case game.RespText:
+		text = resp.Text
+	default:
+		text = resp.Text
+	}
+
+	if text == "" {
+		return
+	}
+
+	if err := bot.SendText(ctx, chatID, text); err != nil {
+		log.Printf("send error (chat %d): %v", chatID, err)
 	}
 }
