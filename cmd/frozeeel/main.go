@@ -35,6 +35,7 @@ func main() {
 		}
 	})
 
+	// TODO: add guide ui for `/start` cmd with inline keyboard callback, palyer can choose time duration, indices etc.
 	bot.OnCommand("start", func(ctx context.Context, msg adapter.IncomingMessage) {
 		if g, ok := loadGame(msg.ChatID); ok {
 			g.In <- game.Event{

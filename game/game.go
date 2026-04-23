@@ -21,16 +21,18 @@ const (
 // GameConfig holds game configuration (reserved for future use).
 type GameConfig struct {
 	// placeholder for future configurable options
+	// TODO: add guess times limit?
 }
 
 // Game is a channel-driven state machine. The Bot layer sends Events to In and
 // reads Responses from Out. All mutable state is owned by the Run goroutine,
 // so no mutex is needed.
 type Game struct {
-	provider provider.AnimeProvider
-	state    State
-	config   GameConfig
-	answer   *provider.Character
+	provider   provider.AnimeProvider
+	state      State
+	config     GameConfig
+	answer     *provider.Character
+	guessCount int
 
 	In  chan Event
 	Out chan Response
@@ -176,6 +178,7 @@ func (g *Game) processGuess(ev Event) {
 	}
 }
 
+// TODO: enhance hit with more info according to guessCount, e.g. tags, summary, etc.
 func (g *Game) sendHint() {
 	if g.answer == nil {
 		g.Out <- Response{Type: RespError, Text: "当前没有进行中的游戏"}
