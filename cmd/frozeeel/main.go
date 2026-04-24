@@ -18,7 +18,7 @@ import (
 var games sync.Map // chatID -> *game.Game, 一个群聊只能存在一场游戏
 
 func main() {
-	godotenv.Load("../.env")
+	godotenv.Load()
 
 	bot, err := tele.NewTelegramAdapter(os.Getenv("BOT_TOKEN"))
 	if err != nil {

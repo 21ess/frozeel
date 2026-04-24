@@ -51,6 +51,17 @@ func NewTelegramAdapter(token string) (adapter.IMAdapter, error) {
 		db:              db,
 	}
 
+	cmd := []telebot.Command{
+		{Text: "build", Description: "限定谜底范围(时间、作品集等)"},
+		{Text: "start", Description: "开始游戏"},
+	}
+
+	// 私聊
+	bot.SetCommands(telebot.CommandScope{Type: telebot.CommandScopeDefault}, cmd)
+
+	// 群聊
+	bot.SetCommands(telebot.CommandScope{Type: telebot.CommandScopeAllGroupChats}, cmd)
+
 	// /build 和 IM 软件强耦合，直接在初始化注册
 	ta.commandHandlers["build"] = func(ctx context.Context, msg adapter.IncomingMessage) {} // 仅做占位
 	bot.Handle("/build", func(c telebot.Context) error {
