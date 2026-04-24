@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -19,18 +19,19 @@ var games sync.Map // chatID -> *game.Game, 一个群聊只能存在一场游戏
 
 func main() {
 	godotenv.Load()
+	ctx := context.Background()
 
 	bot, err := tele.NewTelegramAdapter(os.Getenv("BOT_TOKEN"))
 	if err != nil {
-		log.Fatalf("failed to create adapter: %v", err)
+		slog.Log(ctx, slog.LevelError, "failed to create adapter")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	bot.OnCommand("hello", func(ctx context.Context, msg adapter.IncomingMessage) {
 		if err := bot.SendText(ctx, msg.ChatID, "Hello!"); err != nil {
-			log.Printf("send error: %v", err)
+			slog.Log(ctx, slog.LevelError, "send error", "error", err)
 		}
 	})
 
@@ -91,7 +92,7 @@ func main() {
 
 	// TODO: 一般消息需要过滤
 	bot.OnMessage(func(ctx context.Context, msg adapter.IncomingMessage) {
-		fmt.Printf("[%d] %s: %s\n", msg.ChatID, msg.SenderName, msg.Text)
+		slog.Log(ctx, slog.LevelInfo, "message", "text", msg.Text, "chatID", msg.ChatID, "senderID", msg.SenderID, "senderName", msg.SenderName)
 
 		// TODO 判断是否 @bot
 		g, ok := loadGame(msg.ChatID)
@@ -108,20 +109,20 @@ func main() {
 
 	go func() {
 		if err := bot.Start(ctx); err != nil {
-			log.Fatalf("bot start error: %v", err)
+			slog.Log(ctx, slog.LevelError, "bot start error", "error", err)
 		}
 	}()
 
-	log.Println("bot started")
+	slog.Log(ctx, slog.LevelInfo, "starting...")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("shutting down...")
+	slog.Log(ctx, slog.LevelInfo, "shutting down...")
 	cancel()
 	if err := bot.Stop(); err != nil {
-		log.Printf("stop error: %v", err)
+		slog.Log(ctx, slog.LevelError, "stop error", "error", err)
 	}
 }
 
@@ -150,7 +151,7 @@ func startGame(ctx context.Context, msg adapter.IncomingMessage, bot adapter.IMA
 		for resp := range g.Out {
 			renderResponse(ctx, bot, msg.ChatID, resp)
 		}
-		log.Printf("game ended for chat %d", msg.ChatID)
+		slog.Log(ctx, slog.LevelInfo, "game ended", "chatID", msg.ChatID)
 	}()
 
 	// Send the start event to kick off the game
@@ -188,7 +189,7 @@ func renderResponse(ctx context.Context, bot adapter.IMAdapter, chatID int64, re
 	}
 
 	if err := bot.SendText(ctx, chatID, text); err != nil {
-		log.Printf("send error (chat %d): %v", chatID, err)
+		slog.Log(ctx, slog.LevelError, "send error", "error", err)
 	}
 }
 
