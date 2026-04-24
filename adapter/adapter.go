@@ -23,3 +23,6 @@ type IMAdapter interface {
 	// ReplyText 回复某条消息
 	ReplyText(ctx context.Context, chatID string, replyToMsgID string, text string) error
 }
+
+type GameAdapter interface {
+}

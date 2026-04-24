@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/21ess/frozeel/domain/game"
 	"github.com/21ess/frozeel/provider"
 )
 
@@ -18,34 +19,42 @@ const (
 	StateEnded
 )
 
-// GameConfig holds game configuration (reserved for future use).
+// GameConfig holds game configuration
 type GameConfig struct {
-	// placeholder for future configurable options
-	// TODO: add guess times limit?
+	BuildForm game.BuildForm // /build 时传递答案相关内容
+
 }
 
 // Game is a channel-driven state machine. The Bot layer sends Events to In and
 // reads Responses from Out. All mutable state is owned by the Run goroutine,
 // so no mutex is needed.
 type Game struct {
-	provider   provider.AnimeProvider
-	state      State
-	config     GameConfig
-	answer     *provider.Character
+	provider provider.AnimeProvider
+	state    State // 不允许状态机外部修改状态
+	config   GameConfig
+	answer   *provider.Character
 	guessCount int
 
 	In  chan Event
 	Out chan Response
 }
 
-// NewGame creates a new Game with buffered channels.
-func NewGame(p provider.AnimeProvider) *Game {
+// NewGame creates a new Game with buffered channels (provider set later via SetProvider).
+func NewGame() *Game {
 	return &Game{
-		provider: p,
-		state:    StateIdle,
-		In:       make(chan Event, 16),
-		Out:      make(chan Response, 16),
+		state: StateIdle,
+		In:    make(chan Event, 16),
+		Out:   make(chan Response, 16),
 	}
+}
+
+// SetProvider sets the anime provider for the game.
+func (g *Game) SetProvider(p provider.AnimeProvider) {
+	g.provider = p
+}
+
+func (g *Game) GetState() State {
+	return g.state
 }
 
 // Run is the state machine main loop. It should be launched as a goroutine.
@@ -135,7 +144,7 @@ func (g *Game) handlePlaying(ctx context.Context, ev Event) {
 func (g *Game) startPlaying(ctx context.Context) {
 	c, err := g.provider.GetRandomCharacter(ctx)
 	if err != nil {
-		g.Out <- Response{Type: RespError, Text: fmt.Sprintf("获取角色失败: %v", err)}
+		g.Out <- Response{Type: RespError, Text: fmt.Sprintf("生成答案失败: %v", err)}
 		return
 	}
 	g.answer = c
@@ -158,7 +167,7 @@ func (g *Game) processGuess(ev Event) {
 		PlayerName: ev.SenderName,
 	}
 
-	// TODO 修改为 agent 判断
+	// TODO 修改字符串匹配，如果部分匹配触发 Agent 提示
 	if strings.EqualFold(guess, g.answer.Name) {
 		detail.Outcome = GuessCorrect
 		detail.Feedback = fmt.Sprintf("恭喜 %s 猜对了！答案就是 %s", ev.SenderName, g.answer.Name)

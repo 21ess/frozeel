@@ -12,11 +12,10 @@ import (
 	"github.com/21ess/frozeel/adapter"
 	"github.com/21ess/frozeel/adapter/tele"
 	"github.com/21ess/frozeel/game"
-	"github.com/21ess/frozeel/provider/bangumi"
 	"github.com/joho/godotenv"
 )
 
-var games sync.Map // chatID -> *game.Game
+var games sync.Map // chatID -> *game.Game, 一个群聊只能存在一场游戏
 
 func main() {
 	godotenv.Load("../.env")
@@ -37,15 +36,18 @@ func main() {
 
 	// TODO: add guide ui for `/start` cmd with inline keyboard callback, palyer can choose time duration, indices etc.
 	bot.OnCommand("start", func(ctx context.Context, msg adapter.IncomingMessage) {
-		if g, ok := loadGame(msg.ChatID); ok {
-			g.In <- game.Event{
-				Type:       game.EventStart,
-				SenderID:   msg.SenderID,
-				SenderName: msg.SenderName,
-			}
+		g, ok := loadGame(msg.ChatID)
+		if ok && g.GetState() != game.StateIdle {
+			bot.SendText(ctx, msg.ChatID, "游戏已经开始，请猜一猜吧！")
+			descCurGame(g)
 			return
 		}
-		startGame(ctx, msg, bot)
+
+		if g == nil {
+			g = game.NewGame()
+		}
+
+		startGame(ctx, msg, bot, g)
 	})
 
 	bot.OnCommand("end", func(ctx context.Context, msg adapter.IncomingMessage) {
@@ -87,11 +89,11 @@ func main() {
 		}
 	})
 
-	// TODO: handle guess
-
+	// TODO: 一般消息需要过滤
 	bot.OnMessage(func(ctx context.Context, msg adapter.IncomingMessage) {
 		fmt.Printf("[%d] %s: %s\n", msg.ChatID, msg.SenderName, msg.Text)
 
+		// TODO 判断是否 @bot
 		g, ok := loadGame(msg.ChatID)
 		if !ok {
 			return
@@ -131,9 +133,9 @@ func loadGame(chatID int64) (*game.Game, bool) {
 	return v.(*game.Game), true
 }
 
-func startGame(ctx context.Context, msg adapter.IncomingMessage, bot adapter.IMAdapter) {
-	p := &bangumi.BmProvider{Token: os.Getenv("BANGUMI_TOKEN")}
-	g := game.NewGame(p)
+func startGame(ctx context.Context, msg adapter.IncomingMessage, bot adapter.IMAdapter, g *game.Game) {
+	//p := &bangumi.BmProvider{Token: os.Getenv("BANGUMI_TOKEN")}
+	//g := game.NewGame(p)
 	games.Store(msg.ChatID, g)
 
 	gameCtx, gameCancel := context.WithCancel(ctx)
@@ -188,4 +190,8 @@ func renderResponse(ctx context.Context, bot adapter.IMAdapter, chatID int64, re
 	if err := bot.SendText(ctx, chatID, text); err != nil {
 		log.Printf("send error (chat %d): %v", chatID, err)
 	}
+}
+
+func descCurGame(g *game.Game) string {
+	return fmt.Sprintf("当前游戏：%v", g)
 }

@@ -3,12 +3,13 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/21ess/frozeel/domain/game"
 	"github.com/21ess/frozeel/provider"
-	"github.com/21ess/frozeel/store"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -27,12 +28,12 @@ type MongoGameDB struct {
 	db     *mongo.Database
 }
 
-// Verify interface compliance at compile time.
-var _ store.GameDB = (*MongoGameDB)(nil)
-
 // NewMongoGameDB connects to MongoDB and returns a GameDB implementation.
 func NewMongoGameDB(ctx context.Context, uri string) (*MongoGameDB, error) {
-	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(uri).SetAuth(options.Credential{
+		Username: os.Getenv("MONGO_USER"),
+		Password: os.Getenv("MONGO_PASSWORD"),
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("mongo connect: %w", err)
 	}
@@ -91,7 +92,7 @@ func (m *MongoGameDB) GetCollection(ctx context.Context, id int64) (*game.Collec
 
 	var col game.Collection
 	if err := coll.FindOne(ctx, filter).Decode(&col); err != nil {
-		if err == mongo.ErrNoDocuments {
+		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, fmt.Errorf("collection %d not found", id)
 		}
 		return nil, fmt.Errorf("get collection: %w", err)
@@ -106,6 +107,26 @@ func (m *MongoGameDB) ListCollections(ctx context.Context, count int) ([]*game.C
 		SetLimit(int64(count))
 
 	cursor, err := coll.Find(ctx, bson.M{}, opts)
+	if err != nil {
+		return nil, fmt.Errorf("list collections: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var results []*game.Collection
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, fmt.Errorf("decode collections: %w", err)
+	}
+	return results, nil
+}
+
+func (m *MongoGameDB) ListCollectionsByUser(ctx context.Context, userID int64, src game.IMType) ([]*game.Collection, error) {
+	coll := m.db.Collection(collectionsColl)
+	filter := bson.M{
+		"creator.user_id": userID,
+		"creator.im_src":  src,
+	}
+
+	cursor, err := coll.Find(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("list collections: %w", err)
 	}
