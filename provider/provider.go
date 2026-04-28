@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Range is a [l, u) range => >=l && <u
+// Range is a [l, u) range => >=l && <=u
 type Range[T ~int | ~int64 | ~float32 | ~float64] struct {
 	Lower T
 	Upper T
