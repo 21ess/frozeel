@@ -13,6 +13,8 @@ import (
 
 	"github.com/21ess/frozeel/adapter"
 	"github.com/21ess/frozeel/domain/game"
+	"github.com/21ess/frozeel/domain/im"
+	"github.com/21ess/frozeel/domain/user"
 	"github.com/21ess/frozeel/store"
 	"github.com/21ess/frozeel/store/mongo"
 	"gopkg.in/telebot.v4"
@@ -69,13 +71,13 @@ func NewTelegramAdapter(token string) (adapter.IMAdapter, error) {
 		chatId := c.Chat().ID
 
 		sessionI, ok := ta.buildSessionMap.Load(chatId)
-		var form *game.BuildForm
+		var form *game.UserPerf
 		var session *game.BuildSession
 		if !ok {
 			sessionI = &game.BuildSession{
-				BuildFormMap: map[int64]*game.BuildForm{
+				BuildFormMap: map[int64]*game.UserPerf{
 					uid: {
-						Collection:  game.Collection{},
+						Collection:  user.Collection{},
 						StartYear:   0,
 						StartSeason: 0,
 						EndYear:     0,
@@ -90,8 +92,8 @@ func NewTelegramAdapter(token string) (adapter.IMAdapter, error) {
 		}
 		session = sessionI.(*game.BuildSession)
 		if session.BuildFormMap[uid] == nil {
-			session.BuildFormMap[uid] = &game.BuildForm{
-				Collection:  game.Collection{},
+			session.BuildFormMap[uid] = &game.UserPerf{
+				Collection:  user.Collection{},
 				StartYear:   0,
 				StartSeason: 0,
 				EndYear:     0,
@@ -118,7 +120,7 @@ func NewTelegramAdapter(token string) (adapter.IMAdapter, error) {
 		if err != nil {
 			return c.Edit("查询目录失败，请重试")
 		}
-		userIndices, err := ta.db.ListCollectionsByUser(ctx, uid, game.Telegram)
+		userIndices, err := ta.db.ListCollectionsByUser(ctx, uid, im.Telegram)
 		if err != nil {
 			return c.Edit("查询目录失败，请重试")
 		}
@@ -357,7 +359,7 @@ func (t *TelegramAdapter) ReplyText(ctx context.Context, chatID string, replyToM
 }
 
 // 主面板，不需要 indices
-func (t *TelegramAdapter) buildMenu(form *game.BuildForm) *telebot.ReplyMarkup {
+func (t *TelegramAdapter) buildMenu(form *game.UserPerf) *telebot.ReplyMarkup {
 	rm := &telebot.ReplyMarkup{}
 
 	dirLabel := "未设置"
@@ -389,7 +391,7 @@ func (t *TelegramAdapter) buildMenu(form *game.BuildForm) *telebot.ReplyMarkup {
 }
 
 // 目录子面板，点击 build_dir 时动态查询后调用
-func (t *TelegramAdapter) dirMenu(indices []*game.Collection) *telebot.ReplyMarkup {
+func (t *TelegramAdapter) dirMenu(indices []*user.Collection) *telebot.ReplyMarkup {
 	rm := &telebot.ReplyMarkup{}
 
 	var rows [][]telebot.InlineButton
@@ -407,7 +409,7 @@ func (t *TelegramAdapter) dirMenu(indices []*game.Collection) *telebot.ReplyMark
 }
 
 // getForm returns the BuildForm for the given chat and user, or nil if not found.
-func (t *TelegramAdapter) getForm(chatID, uid int64) *game.BuildForm {
+func (t *TelegramAdapter) getForm(chatID, uid int64) *game.UserPerf {
 	sessionI, ok := t.buildSessionMap.Load(chatID)
 	if !ok {
 		return nil

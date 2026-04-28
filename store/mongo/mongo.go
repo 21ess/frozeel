@@ -8,7 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/21ess/frozeel/domain/game"
+	"github.com/21ess/frozeel/domain/im"
+	"github.com/21ess/frozeel/domain/user"
 	"github.com/21ess/frozeel/provider"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -86,11 +87,11 @@ func (m *MongoGameDB) nextID(ctx context.Context, seqName string) (int64, error)
 	return result.Seq, nil
 }
 
-func (m *MongoGameDB) GetCollection(ctx context.Context, id int64) (*game.Collection, error) {
+func (m *MongoGameDB) GetCollection(ctx context.Context, id int64) (*user.Collection, error) {
 	coll := m.db.Collection(collectionsColl)
 	filter := bson.M{"id": id}
 
-	var col game.Collection
+	var col user.Collection
 	if err := coll.FindOne(ctx, filter).Decode(&col); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, fmt.Errorf("collection %d not found", id)
@@ -100,7 +101,7 @@ func (m *MongoGameDB) GetCollection(ctx context.Context, id int64) (*game.Collec
 	return &col, nil
 }
 
-func (m *MongoGameDB) ListCollections(ctx context.Context, count int) ([]*game.Collection, error) {
+func (m *MongoGameDB) ListCollections(ctx context.Context, count int) ([]*user.Collection, error) {
 	coll := m.db.Collection(collectionsColl)
 	opts := options.Find().
 		SetSort(bson.D{{Key: "popularity", Value: -1}}).
@@ -112,14 +113,14 @@ func (m *MongoGameDB) ListCollections(ctx context.Context, count int) ([]*game.C
 	}
 	defer cursor.Close(ctx)
 
-	var results []*game.Collection
+	var results []*user.Collection
 	if err := cursor.All(ctx, &results); err != nil {
 		return nil, fmt.Errorf("decode collections: %w", err)
 	}
 	return results, nil
 }
 
-func (m *MongoGameDB) ListCollectionsByUser(ctx context.Context, userID int64, src game.IMType) ([]*game.Collection, error) {
+func (m *MongoGameDB) ListCollectionsByUser(ctx context.Context, userID int64, src im.IMType) ([]*user.Collection, error) {
 	coll := m.db.Collection(collectionsColl)
 	filter := bson.M{
 		"creator.user_id": userID,
@@ -132,14 +133,14 @@ func (m *MongoGameDB) ListCollectionsByUser(ctx context.Context, userID int64, s
 	}
 	defer cursor.Close(ctx)
 
-	var results []*game.Collection
+	var results []*user.Collection
 	if err := cursor.All(ctx, &results); err != nil {
 		return nil, fmt.Errorf("decode collections: %w", err)
 	}
 	return results, nil
 }
 
-func (m *MongoGameDB) CreateCollection(ctx context.Context, collection *game.Collection) error {
+func (m *MongoGameDB) CreateCollection(ctx context.Context, collection *user.Collection) error {
 	id, err := m.nextID(ctx, collectionsCounter)
 	if err != nil {
 		return err

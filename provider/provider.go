@@ -29,7 +29,7 @@ type Character struct {
 	// Nsfw     bool     `json:"nsfw"`     // R18 or not / hentai or regular
 }
 
-// Subject is a set of characters, e.g. an anime, a manga...
+// Subject is a set of characters, e.g. an anime, a mange, a game ...
 type Subject struct {
 	Name        string       `json:"name"`
 	PublishDate time.Time    `json:"publish_date"`

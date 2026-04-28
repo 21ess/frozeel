@@ -21,7 +21,7 @@ const (
 
 // GameConfig holds game configuration
 type GameConfig struct {
-	BuildForm game.BuildForm // /build 时传递答案相关内容
+	perf game.UserPerf // /build 时传递答案相关内容
 
 }
 
@@ -29,10 +29,10 @@ type GameConfig struct {
 // reads Responses from Out. All mutable state is owned by the Run goroutine,
 // so no mutex is needed.
 type Game struct {
-	provider provider.AnimeProvider
-	state    State // 不允许状态机外部修改状态
-	config   GameConfig
-	answer   *provider.Character
+	provider   provider.AnimeProvider
+	state      State // 不允许状态机外部修改状态
+	config     GameConfig
+	answer     *provider.Character
 	guessCount int
 
 	In  chan Event
