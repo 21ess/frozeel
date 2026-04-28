@@ -122,6 +122,11 @@ loop:
 }
 
 // SendUserMsg Agent 运行过程中发送用户级信息
-func (f *FrozeelAgent) SendUserMsg(msg string) {
-	f.ch <- &schema.Message{Role: schema.User, Content: msg}
+func (f *FrozeelAgent) SendUserMsg(ctx context.Context, msg string) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case f.ch <- &schema.Message{Role: schema.User, Content: msg}:
+		return nil
+	}
 }
