@@ -8,7 +8,7 @@ import (
 )
 
 // Range is a [l, u) range => >=l && <u
-type Range[T comparable] struct {
+type Range[T ~int | ~int64 | ~float32 | ~float64] struct {
 	Lower T
 	Upper T
 }
@@ -100,6 +100,7 @@ type AnimeProvider interface {
 // Character each game's answer, randomly picked from provider list
 type Character struct {
 	Name     string   `json:"name"`
+	Alias    []string `json:"alias"` // names in other langs
 	Summary  string   `json:"summary"`
 	Image    string   `json:"image"` // default to large medium images
 	Gender   string   `json:"gender"`

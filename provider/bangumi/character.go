@@ -11,20 +11,25 @@ import (
 
 // GetRandomCharacter get character from random subject
 func (b *BmProvider) GetRandomCharacter(ctx context.Context, opts ...provider.SubjectOption) (*provider.Character, error) {
-	sub, err := b.GetRandomSubject(ctx, opts...)
+	option := mergeSubjectQuery(opts...)
+	sub, err := b.GetRandomSubject(ctx, option)
 	if err != nil {
 		return nil, err
 	}
-	if sub == nil || sub.ID == 0 {
+	if sub.ID == 0 {
 		return b.getRandomCharacterFallback(ctx)
 		// return nil, fmt.Errorf("failed to resolve random subject for character selection")
 	}
 
-	chList, err := b.searchSubjectCharacters(ctx, sub.ID)
-	if err != nil || chList == nil || len(chList.Data) == 0 {
+	mainChList, _, err := b.searchCharactersInSubject(ctx, sub.ID)
+	if err != nil || len(mainChList) == 0 {
 		return b.getRandomCharacterFallback(ctx)
 	}
-	ch := chList.Data[rand2.IntN(len(chList.Data))]
+
+	// TODO: enhance here
+	// only main characters now
+	ch := mainChList[rand2.IntN(len(mainChList))]
+
 	// get character details
 	chDetail, err := b.searchCharacterById(ctx, ch.ID)
 	if err != nil {
@@ -55,7 +60,6 @@ func (b *BmProvider) GetCharacterByName(ctx context.Context, name string) (*prov
 		Gender:   char.Gender,
 		Birthday: parseBirthday(char),
 		Tags:     parseTags(char.Infobox),
-		// Nsfw:     char.NSFW,
 	}, nil
 }
 
@@ -86,7 +90,7 @@ func (b *BmProvider) getRandomCharacterFallback(ctx context.Context) (*provider.
 
 func (b *BmProvider) searchCharacterById(ctx context.Context, chId int) (*provider.Character, error) {
 	url := fmt.Sprintf("%s/v0/characters/%d", BaseUrl, chId)
-	var result bangumiCharacter
+	var result character
 	if err := provider.DoHTTPJSON(ctx, "GET", url, nil, b.Token, &result); err != nil {
 		return nil, fmt.Errorf("search character by id: %w", err)
 	}
@@ -101,19 +105,32 @@ func (b *BmProvider) searchCharacterById(ctx context.Context, chId int) (*provid
 	}, nil
 }
 
-func (b *BmProvider) searchSubjectCharacters(ctx context.Context, subjectID int) (*bangumiSubjectCharacterResponse, error) {
+func (b *BmProvider) searchCharactersInSubject(ctx context.Context, subjectID int) (mainCharacters []characterInSubject, supportCharacters []characterInSubject, err error) {
+	result := make([]characterInSubject, 0)
+
 	url := fmt.Sprintf("%s/v0/subjects/%d/characters", BaseUrl, subjectID)
-	var result bangumiSubjectCharacterResponse
-	if err := provider.DoHTTPJSON(ctx, "GET", url, nil, b.Token, &result); err != nil {
-		return nil, fmt.Errorf("search subject characters: %w", err)
+	err = provider.DoHTTPJSON(ctx, "GET", url, nil, b.Token, &result)
+	if err != nil {
+		return
 	}
 
-	return &result, nil
+	// keep main characters and support characters, filter out irrelevant ones
+	mainCharacters = make([]characterInSubject, 0, len(result))
+	supportCharacters = make([]characterInSubject, 0, len(result))
+	for _, ch := range result {
+		switch ch.Role {
+		case "主角":
+			mainCharacters = append(mainCharacters, ch)
+		case "配角":
+			supportCharacters = append(supportCharacters, ch)
+		}
+	}
+	return
 }
 
 // searchCharacters search character by keyword, if keyword is empty
 // it will return random characters with offset and limit
-func (b *BmProvider) searchCharacters(ctx context.Context, offset, limit int, keyword string) (*bangumiSearchResponse, error) {
+func (b *BmProvider) searchCharacters(ctx context.Context, offset, limit int, keyword string) (result *bangumiResponse[character], err error) {
 	url := fmt.Sprintf("%s/v0/search/characters?limit=%d&offset=%d", BaseUrl, limit, offset)
 	payload := map[string]any{
 		"keyword": keyword,
@@ -124,11 +141,10 @@ func (b *BmProvider) searchCharacters(ctx context.Context, offset, limit int, ke
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
-	var result bangumiSearchResponse
 	if err := provider.DoHTTPJSON(ctx, "POST", url, bodyByte, b.Token, &result); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return
 }
 
 func pickFirstImage(img images) string {
@@ -144,17 +160,7 @@ func pickFirstImage(img images) string {
 	return img.Small
 }
 
-func pickSubjectCharacterName(char bangumiSubjectCharacter) string {
-	if char.Name != "" {
-		return char.Name
-	}
-	if char.NameCN != "" {
-		return char.NameCN
-	}
-	return char.NameJP
-}
-
-func parseBirthday(c bangumiCharacter) string {
+func parseBirthday(c character) string {
 	if c.BirthMon > 0 && c.BirthDay > 0 {
 		return fmt.Sprintf("%d月%d日", c.BirthMon, c.BirthDay)
 	}

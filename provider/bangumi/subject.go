@@ -19,11 +19,12 @@ var totOffset = 999
 // default query settings
 const (
 	DefaultSort      = "heat"
-	DefaultYearRange = 30
+	DefaultYearRange = 25
 )
 
-func (b *BmProvider) GetRandomSubject(ctx context.Context, opts ...provider.SubjectOption) (*provider.Subject, error) {
-	option := mergeSubjectQuery(opts...)
+// GetRandomSubject get random subject with given filters
+// 2 times request will be made
+func (b *BmProvider) GetRandomSubject(ctx context.Context, option *provider.SubjectQuery) (*provider.Subject, error) {
 	filters := buildSubjectFilters(option)
 
 	// get totle offset
@@ -66,8 +67,8 @@ func mergeSubjectQuery(opts ...provider.SubjectOption) *provider.SubjectQuery {
 func buildSubjectFilters(opt *provider.SubjectQuery) map[string]any {
 	filters := map[string]any{
 		"nsfw": opt.Nsfw, // default to false
+		"sort": DefaultSort,
 	}
-	filters["sort"] = DefaultSort
 	if opt.Sort != "" {
 		filters["sort"] = opt.Sort
 	}
@@ -85,13 +86,18 @@ func buildSubjectFilters(opt *provider.SubjectQuery) map[string]any {
 	if len(opt.Type) > 0 {
 		filters["type"] = append([]int(nil), opt.Type...)
 	}
-	if ratingFilter := buildFloatRangeFilter(opt.Rating); len(ratingFilter) > 0 {
+
+	if ratingFilter := buildRangeFilter(opt.Rating, func(f float32) string {
+		return strconv.FormatFloat(float64(f), 'f', -1, 32)
+	}); len(ratingFilter) > 0 {
 		filters["rating"] = ratingFilter
 	}
-	if rankFilter := buildIntRangeFilter(opt.Rank); len(rankFilter) > 0 {
+
+	if rankFilter := buildRangeFilter(opt.Rank, func(i int) string {
+		return fmt.Sprintf("%d", i)
+	}); len(rankFilter) > 0 {
 		filters["rank"] = rankFilter
 	}
-
 	return filters
 }
 
@@ -119,27 +125,40 @@ func buildAirDateFilter(yearRange provider.Range[int]) []string {
 	return filter
 }
 
-func buildIntRangeFilter(r provider.Range[int]) []string {
+func buildRangeFilter[T ~int | ~int64 | ~float32 | ~float64](r provider.Range[T], format func(T) string) []string {
 	filter := make([]string, 0, 2)
-	if r.Lower > 0 {
-		filter = append(filter, fmt.Sprintf(">=%d", r.Lower))
+
+	var zero T
+	if r.Lower > zero {
+		filter = append(filter, ">="+format(r.Lower))
 	}
-	if r.Upper > 0 {
-		filter = append(filter, fmt.Sprintf("<%d", r.Upper))
+	if r.Upper > zero {
+		filter = append(filter, "<"+format(r.Upper))
 	}
 	return filter
 }
 
-func buildFloatRangeFilter(r provider.Range[float32]) []string {
-	filter := make([]string, 0, 2)
-	if r.Lower > 0 {
-		filter = append(filter, ">="+strconv.FormatFloat(float64(r.Lower), 'f', -1, 32))
-	}
-	if r.Upper > 0 {
-		filter = append(filter, "<"+strconv.FormatFloat(float64(r.Upper), 'f', -1, 32))
-	}
-	return filter
-}
+// func buildIntRangeFilter(r provider.Range[int]) []string {
+// 	filter := make([]string, 0, 2)
+// 	if r.Lower > 0 {
+// 		filter = append(filter, fmt.Sprintf(">=%d", r.Lower))
+// 	}
+// 	if r.Upper > 0 {
+// 		filter = append(filter, fmt.Sprintf("<%d", r.Upper))
+// 	}
+// 	return filter
+// }
+//
+// func buildFloatRangeFilter(r provider.Range[float32]) []string {
+// 	filter := make([]string, 0, 2)
+// 	if r.Lower > 0 {
+// 		filter = append(filter, ">="+strconv.FormatFloat(float64(r.Lower), 'f', -1, 32))
+// 	}
+// 	if r.Upper > 0 {
+// 		filter = append(filter, "<"+strconv.FormatFloat(float64(r.Upper), 'f', -1, 32))
+// 	}
+// 	return filter
+// }
 
 func dedupeInts(in []int) []int {
 	s := slices.Clone(in)
@@ -158,7 +177,7 @@ func dedupeInts(in []int) []int {
 	return out
 }
 
-func (b *BmProvider) searchSubjects(ctx context.Context, offset, limit int, filters map[string]any) (*bangumiSubjectResponse, error) {
+func (b *BmProvider) searchSubjects(ctx context.Context, offset, limit int, filters map[string]any) (result *bangumiResponse[subject], err error) {
 	url := fmt.Sprintf("%s/v0/search/subjects?limit=%d&offset=%d", BaseUrl, limit, offset)
 	bodyMap := map[string]any{
 		"keyword": "",
@@ -173,28 +192,26 @@ func (b *BmProvider) searchSubjects(ctx context.Context, offset, limit int, filt
 		return nil, fmt.Errorf("failed to marshal subject request body: %w", err)
 	}
 
-	var result bangumiSubjectResponse
 	if err := provider.DoHTTPJSON(ctx, "POST", url, bodyByte, b.Token, &result); err != nil {
 		return nil, fmt.Errorf("search subjects: %w", err)
 	}
 
-	return &result, nil
+	return
 }
 
-func convertSubject(sub bangumiSubject) *provider.Subject {
+func convertSubject(sub subject) *provider.Subject {
 	return &provider.Subject{
 		ID:          sub.ID,
 		Name:        pickSubjectName(sub),
-		Alias:       []string{sub.NameCN, sub.Name, sub.NameJP},
+		Alias:       []string{sub.Name, sub.NameJP},
 		PublishDate: parseAirDateToTime(sub.AirDate),
-		Characters:  nil,
 		Tags:        parseSubjectTags(sub),
 		Image:       pickFirstImage(sub.Images),
 		Nsfw:        sub.NSFW,
 	}
 }
 
-func pickSubjectName(s bangumiSubject) string {
+func pickSubjectName(s subject) string {
 	if s.NameCN != "" {
 		return s.NameCN
 	}
@@ -207,10 +224,14 @@ func pickSubjectName(s bangumiSubject) string {
 	return ""
 }
 
-func parseSubjectTags(s bangumiSubject) []string {
+func parseSubjectTags(s subject) []string {
 	tags := make([]string, 0)
 	if len(s.Tags) > 0 {
-		tags = append(tags, s.Tags...)
+		for _, tag := range s.Tags {
+			if tag.Name != "" {
+				tags = append(tags, tag.Name)
+			}
+		}
 	}
 
 	if len(s.MetaTags) > 0 {
