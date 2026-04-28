@@ -12,6 +12,8 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/deep"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -23,7 +25,7 @@ type FrozeelAgent struct {
 
 func NewFrozeelAgent() {}
 
-func NewAgentRunner(ctx context.Context, prompt string) *adk.Runner {
+func NewAgentRunner(ctx context.Context, prompt string, tools ...tool.BaseTool) *adk.Runner {
 	model, err := qwen.NewChatModel(ctx, &qwen.ChatModelConfig{
 		APIKey:  os.Getenv("LLM_API_KEY"),
 		Model:   os.Getenv("LLM_MODEL_ID"),
@@ -48,6 +50,11 @@ func NewAgentRunner(ctx context.Context, prompt string) *adk.Runner {
 		Backend:        backend,
 		StreamingShell: backend,
 		MaxIteration:   50,
+		ToolsConfig: adk.ToolsConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools: tools,
+			},
+		},
 	})
 
 	if err != nil {
