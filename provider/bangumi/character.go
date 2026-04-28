@@ -11,8 +11,7 @@ import (
 
 // GetRandomCharacter get character from random subject
 func (b *BmProvider) GetRandomCharacter(ctx context.Context, opts ...provider.SubjectOption) (*provider.Character, error) {
-	option := mergeSubjectQuery(opts...)
-	sub, err := b.GetRandomSubject(ctx, option)
+	sub, err := b.GetRandomSubject(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

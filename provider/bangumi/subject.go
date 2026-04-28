@@ -24,7 +24,8 @@ const (
 
 // GetRandomSubject get random subject with given filters
 // 2 times request will be made
-func (b *BmProvider) GetRandomSubject(ctx context.Context, option *provider.SubjectQuery) (*provider.Subject, error) {
+func (b *BmProvider) GetRandomSubject(ctx context.Context, opts ...provider.SubjectOption) (*provider.Subject, error) {
+	option := mergeSubjectQuery(opts...)
 	filters := buildSubjectFilters(option)
 
 	// get totle offset
