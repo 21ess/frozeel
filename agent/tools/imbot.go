@@ -24,12 +24,12 @@ func NewTelegramSendTool(imAdapter adapter.IMAdapter) *IMSendTool {
 
 func (i *IMSendTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "send_telegram_message",
-		Desc: "通过 Telegram 发送消息到指定聊天",
+		Name: "send_im_message",
+		Desc: "通过IM软件接口发送消息到指定聊天",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"chat_id": {
 				Type:     schema.Integer,
-				Desc:     "Telegram 聊天 ID（群组或私聊）",
+				Desc:     "聊天 ID（群组或私聊）",
 				Required: true,
 			},
 			"text": {
