@@ -20,17 +20,20 @@ func NewBangumiSearchTool(bmProvider *bangumi.BmProvider) *BangumiSearchTool {
 	}
 }
 
-func (b *BangumiSearchTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (b *BangumiSearchTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: "search_bangumi_character",
 		Desc: "搜索 Bangumi acg 角色信息，包括角色名称、简介、性别、生日等",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-			// TODO
+			"name": {
+				Type:     schema.String,
+				Required: true,
+			},
 		}),
 	}, nil
+}
+
+func (b *BangumiSearchTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	//TODO implement me
+	panic("implement me")
 }
